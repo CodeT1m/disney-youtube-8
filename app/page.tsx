@@ -1,178 +1,137 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { MovieCarousel } from "@/components/movie-carousel"
-import { AIRecommendations } from "@/components/ai-recommendations"
 import { SearchModal } from "@/components/search-modal"
+import { AIRecommendations } from "@/components/ai-recommendations"
+import {
+  getTrendingMovies,
+  getPopularMovies,
+  getTopRatedMovies,
+  getActionMovies,
+  getComedyMovies,
+  getHorrorMovies,
+  getRomanceMovies,
+  getImageUrl,
+  type Movie,
+} from "@/lib/tmdb"
 
-const trendingMovies = [
-  {
-    id: 1,
-    title: "Avatar: The Way of Water",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2022,
-    rating: 8.1,
-    genre: "Sci-Fi",
-  },
-  {
-    id: 2,
-    title: "Top Gun: Maverick",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2022,
-    rating: 8.3,
-    genre: "Action",
-  },
-  {
-    id: 3,
-    title: "Black Panther: Wakanda Forever",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2022,
-    rating: 7.3,
-    genre: "Action",
-  },
-  {
-    id: 4,
-    title: "The Batman",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2022,
-    rating: 7.8,
-    genre: "Action",
-  },
-  {
-    id: 5,
-    title: "Doctor Strange: Multiverse of Madness",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2022,
-    rating: 7.0,
-    genre: "Fantasy",
-  },
-  {
-    id: 6,
-    title: "Minions: The Rise of Gru",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2022,
-    rating: 6.5,
-    genre: "Animation",
-  },
-]
+interface MovieWithImage extends Omit<Movie, "poster_path"> {
+  image: string
+  year: number
+  rating: number
+  genre: string
+}
 
-const actionMovies = [
-  {
-    id: 7,
-    title: "John Wick: Chapter 4",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2023,
-    rating: 8.2,
-    genre: "Action",
-  },
-  {
-    id: 8,
-    title: "Fast X",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2023,
-    rating: 6.8,
-    genre: "Action",
-  },
-  {
-    id: 9,
-    title: "Mission: Impossible 7",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2023,
-    rating: 8.0,
-    genre: "Action",
-  },
-  {
-    id: 10,
-    title: "Extraction 2",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2023,
-    rating: 7.5,
-    genre: "Action",
-  },
-  {
-    id: 11,
-    title: "The Gray Man",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2022,
-    rating: 6.5,
-    genre: "Action",
-  },
-  {
-    id: 12,
-    title: "Red Notice",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2021,
-    rating: 6.3,
-    genre: "Action",
-  },
-]
-
-const comedyMovies = [
-  {
-    id: 13,
-    title: "Glass Onion: A Knives Out Mystery",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2022,
-    rating: 7.2,
-    genre: "Comedy",
-  },
-  {
-    id: 14,
-    title: "Don't Look Up",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2021,
-    rating: 7.2,
-    genre: "Comedy",
-  },
-  {
-    id: 15,
-    title: "The Adam Project",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2022,
-    rating: 6.7,
-    genre: "Comedy",
-  },
-  {
-    id: 16,
-    title: "Enola Holmes 2",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2022,
-    rating: 6.8,
-    genre: "Comedy",
-  },
-  {
-    id: 17,
-    title: "The Kissing Booth 3",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2021,
-    rating: 5.9,
-    genre: "Comedy",
-  },
-  {
-    id: 18,
-    title: "Murder Mystery 2",
-    image: "/placeholder.svg?height=400&width=300",
-    year: 2023,
-    rating: 5.7,
-    genre: "Comedy",
-  },
-]
-
-export default function Home() {
+export default function HomePage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [featuredMovie, setFeaturedMovie] = useState<MovieWithImage | null>(null)
+  const [trendingMovies, setTrendingMovies] = useState<MovieWithImage[]>([])
+  const [popularMovies, setPopularMovies] = useState<MovieWithImage[]>([])
+  const [topRatedMovies, setTopRatedMovies] = useState<MovieWithImage[]>([])
+  const [actionMovies, setActionMovies] = useState<MovieWithImage[]>([])
+  const [comedyMovies, setComedyMovies] = useState<MovieWithImage[]>([])
+  const [horrorMovies, setHorrorMovies] = useState<MovieWithImage[]>([])
+  const [romanceMovies, setRomanceMovies] = useState<MovieWithImage[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const transformMovies = (movies: Movie[], genre: string): MovieWithImage[] => {
+    return movies.map((movie) => ({
+      ...movie,
+      image: getImageUrl(movie.poster_path),
+      year: new Date(movie.release_date).getFullYear() || 2024,
+      rating: Math.round(movie.vote_average * 10) / 10,
+      genre,
+    }))
+  }
+
+  useEffect(() => {
+    async function fetchAllMovies() {
+      try {
+        const [trending, popular, topRated, action, comedy, horror, romance] = await Promise.all([
+          getTrendingMovies(),
+          getPopularMovies(),
+          getTopRatedMovies(),
+          getActionMovies(),
+          getComedyMovies(),
+          getHorrorMovies(),
+          getRomanceMovies(),
+        ])
+
+        const transformedTrending = transformMovies(trending, "Trending")
+        const transformedPopular = transformMovies(popular, "Popular")
+        const transformedTopRated = transformMovies(topRated, "Top Rated")
+        const transformedAction = transformMovies(action, "Action")
+        const transformedComedy = transformMovies(comedy, "Comedy")
+        const transformedHorror = transformMovies(horror, "Horror")
+        const transformedRomance = transformMovies(romance, "Romance")
+
+        setTrendingMovies(transformedTrending)
+        setPopularMovies(transformedPopular)
+        setTopRatedMovies(transformedTopRated)
+        setActionMovies(transformedAction)
+        setComedyMovies(transformedComedy)
+        setHorrorMovies(transformedHorror)
+        setRomanceMovies(transformedRomance)
+
+        // Set featured movie from trending
+        if (transformedTrending.length > 0) {
+          setFeaturedMovie(transformedTrending[0])
+        }
+      } catch (error) {
+        console.error("Error fetching movies:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAllMovies()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <Header onSearchClick={() => setIsSearchOpen(true)} />
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-xl">Loading movies...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <Header onSearchClick={() => setIsSearchOpen(true)} />
-      <HeroSection />
+
+      {featuredMovie && (
+        <HeroSection
+          title={featuredMovie.title}
+          description={featuredMovie.overview}
+          backgroundImage={getImageUrl(featuredMovie.backdrop_path, "original")}
+          rating={featuredMovie.rating}
+          year={featuredMovie.year}
+          genre={featuredMovie.genre}
+        />
+      )}
 
       <div className="px-4 md:px-8 lg:px-16 space-y-8 pb-16">
-        <MovieCarousel title="Trending Now" movies={trendingMovies} />
+        {trendingMovies.length > 0 && <MovieCarousel title="Trending Now" movies={trendingMovies.slice(0, 18)} />}
+
+        {popularMovies.length > 0 && <MovieCarousel title="Popular Movies" movies={popularMovies.slice(0, 18)} />}
+
         <AIRecommendations />
-        <MovieCarousel title="Action & Adventure" movies={actionMovies} />
-        <MovieCarousel title="Comedy Movies" movies={comedyMovies} />
+
+        {actionMovies.length > 0 && <MovieCarousel title="Action Movies" movies={actionMovies.slice(0, 18)} />}
+
+        {comedyMovies.length > 0 && <MovieCarousel title="Comedy Movies" movies={comedyMovies.slice(0, 18)} />}
+
+        {topRatedMovies.length > 0 && <MovieCarousel title="Top Rated" movies={topRatedMovies.slice(0, 18)} />}
+
+        {horrorMovies.length > 0 && <MovieCarousel title="Horror Movies" movies={horrorMovies.slice(0, 18)} />}
+
+        {romanceMovies.length > 0 && <MovieCarousel title="Romance Movies" movies={romanceMovies.slice(0, 18)} />}
       </div>
 
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />

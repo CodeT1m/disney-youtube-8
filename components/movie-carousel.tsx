@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { ChevronLeft, ChevronRight, Star, Play } from "lucide-react"
+import { useState, useRef } from "react"
+import { ChevronLeft, ChevronRight, Play, Plus, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 
@@ -12,6 +12,7 @@ interface Movie {
   year: number
   rating: number
   genre: string
+  overview: string
 }
 
 interface MovieCarouselProps {
@@ -20,73 +21,79 @@ interface MovieCarouselProps {
 }
 
 export function MovieCarousel({ title, movies }: MovieCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
   const [hoveredMovie, setHoveredMovie] = useState<number | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  const nextSlide = () => {
-    setCurrentIndex((prev) => (prev + 1) % Math.max(1, movies.length - 5))
+  const scroll = (direction: "left" | "right") => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 320 * 3 // Width of 3 cards
+      scrollContainerRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      })
+    }
   }
 
-  const prevSlide = () => {
-    setCurrentIndex((prev) => (prev - 1 + Math.max(1, movies.length - 5)) % Math.max(1, movies.length - 5))
-  }
+  if (movies.length === 0) return null
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-white">{title}</h2>
+      <h2 className="text-2xl font-bold text-foreground">{title}</h2>
       <div className="relative group">
-        <div className="overflow-hidden">
-          <div
-            className="flex transition-transform duration-300 ease-in-out gap-2"
-            style={{ transform: `translateX(-${currentIndex * 20}%)` }}
-          >
-            {movies.map((movie) => (
-              <Card
-                key={movie.id}
-                className="flex-shrink-0 w-48 bg-gray-900 border-gray-800 overflow-hidden cursor-pointer transition-all duration-300 hover:scale-105 hover:z-10"
-                onMouseEnter={() => setHoveredMovie(movie.id)}
-                onMouseLeave={() => setHoveredMovie(null)}
-              >
-                <div className="relative">
-                  <img src={movie.image || "/placeholder.svg"} alt={movie.title} className="w-full h-72 object-cover" />
-                  {hoveredMovie === movie.id && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <Button size="icon" className="bg-white/20 hover:bg-white/30">
-                        <Play className="h-6 w-6" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                <div className="p-3">
-                  <h3 className="font-semibold text-white text-sm mb-1 line-clamp-2">{movie.title}</h3>
-                  <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span>{movie.year}</span>
-                    <div className="flex items-center">
-                      <Star className="h-3 w-3 text-yellow-500 mr-1" />
-                      <span>{movie.rating}</span>
-                    </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => scroll("left")}
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </Button>
+
+        <div
+          ref={scrollContainerRef}
+          className="flex space-x-4 overflow-x-auto scrollbar-hide pb-4"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {movies.map((movie) => (
+            <Card
+              key={movie.id}
+              className="flex-shrink-0 w-72 bg-card border-border overflow-hidden cursor-pointer transition-all duration-300 hover:scale-105 hover:z-10"
+              onMouseEnter={() => setHoveredMovie(movie.id)}
+              onMouseLeave={() => setHoveredMovie(null)}
+            >
+              <div className="relative">
+                <img src={movie.image || "/placeholder.svg"} alt={movie.title} className="w-full h-40 object-cover" />
+                {hoveredMovie === movie.id && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center space-x-2">
+                    <Button size="sm" className="bg-white text-black hover:bg-gray-200">
+                      <Play className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-white hover:bg-white/20">
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-white hover:bg-white/20">
+                      <Info className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <span className="text-xs text-gray-500">{movie.genre}</span>
+                )}
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold text-foreground truncate">{movie.title}</h3>
+                <div className="flex items-center justify-between text-sm text-muted-foreground mt-1">
+                  <span>{movie.year}</span>
+                  <span className="flex items-center">⭐ {movie.rating}</span>
                 </div>
-              </Card>
-            ))}
-          </div>
+                <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{movie.overview}</p>
+              </div>
+            </Card>
+          ))}
         </div>
 
         <Button
           variant="ghost"
           size="icon"
-          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={prevSlide}
-        >
-          <ChevronLeft className="h-6 w-6" />
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={nextSlide}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => scroll("right")}
         >
           <ChevronRight className="h-6 w-6" />
         </Button>

@@ -1,103 +1,121 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Search, X } from "lucide-react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
+import { searchMovies, getImageUrl, type Movie } from "@/lib/tmdb"
+import { useDebounce } from "@/hooks/use-debounce"
 
 interface SearchModalProps {
   isOpen: boolean
   onClose: () => void
 }
 
-const searchResults = [
-  {
-    id: 1,
-    title: "Avatar: The Way of Water",
-    image: "/placeholder.svg?height=150&width=100",
-    year: 2022,
-    type: "Movie",
-  },
-  {
-    id: 2,
-    title: "The Batman",
-    image: "/placeholder.svg?height=150&width=100",
-    year: 2022,
-    type: "Movie",
-  },
-  {
-    id: 3,
-    title: "Stranger Things",
-    image: "/placeholder.svg?height=150&width=100",
-    year: 2022,
-    type: "TV Series",
-  },
-  {
-    id: 4,
-    title: "Wednesday",
-    image: "/placeholder.svg?height=150&width=100",
-    year: 2022,
-    type: "TV Series",
-  },
-]
+interface SearchResult {
+  id: number
+  title: string
+  image: string
+  year: number
+  type: string
+  overview: string
+  rating: number
+}
 
 export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [query, setQuery] = useState("")
-  const [results, setResults] = useState(searchResults)
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const debouncedQuery = useDebounce(query, 500)
+
+  const searchForMovies = useCallback(async (searchQuery: string) => {
+    if (!searchQuery.trim()) {
+      setResults([])
+      return
+    }
+
+    setLoading(true)
+    try {
+      const data = await searchMovies(searchQuery)
+      const transformedResults: SearchResult[] = data.results.map((movie: Movie) => ({
+        id: movie.id,
+        title: movie.title,
+        image: getImageUrl(movie.poster_path, "w154"),
+        year: new Date(movie.release_date).getFullYear() || 0,
+        type: "Movie",
+        overview: movie.overview,
+        rating: Math.round(movie.vote_average * 10) / 10,
+      }))
+      setResults(transformedResults.slice(0, 10)) // Limit to 10 results
+    } catch (error) {
+      console.error("Error searching movies:", error)
+      setResults([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    if (query.trim()) {
-      const filtered = searchResults.filter((item) => item.title.toLowerCase().includes(query.toLowerCase()))
-      setResults(filtered)
-    } else {
-      setResults(searchResults)
-    }
-  }, [query])
+    searchForMovies(debouncedQuery)
+  }, [debouncedQuery, searchForMovies])
+
+  const handleClose = () => {
+    setQuery("")
+    setResults([])
+    onClose()
+  }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-black border-gray-800 max-w-2xl max-h-[80vh] overflow-hidden p-0">
-        <div className="flex items-center border-b border-gray-800 p-4">
-          <Search className="h-5 w-5 text-gray-400 mr-3" />
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="bg-background border-border max-w-2xl max-h-[80vh] overflow-hidden p-0">
+        <div className="flex items-center border-b border-border p-4">
+          <Search className="h-5 w-5 text-muted-foreground mr-3" />
           <Input
-            placeholder="Search movies, TV shows..."
+            placeholder="Search movies..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="border-0 bg-transparent text-white placeholder-gray-400 focus-visible:ring-0"
+            className="border-0 bg-transparent text-foreground placeholder-muted-foreground focus-visible:ring-0"
             autoFocus
           />
-          <button onClick={onClose} className="ml-3 text-gray-400 hover:text-white">
+          <button onClick={handleClose} className="ml-3 text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="p-4 overflow-y-auto max-h-96">
-          {results.length > 0 ? (
+          {loading ? (
+            <div className="text-center text-muted-foreground py-8">Searching...</div>
+          ) : results.length > 0 ? (
             <div className="space-y-3">
               {results.map((item) => (
                 <Card
                   key={item.id}
-                  className="bg-gray-900 border-gray-800 p-3 cursor-pointer hover:bg-gray-800 transition-colors"
+                  className="bg-card border-border p-3 cursor-pointer hover:bg-accent transition-colors"
                 >
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-start space-x-3">
                     <img
                       src={item.image || "/placeholder.svg"}
                       alt={item.title}
-                      className="w-12 h-16 object-cover rounded"
+                      className="w-12 h-16 object-cover rounded flex-shrink-0"
                     />
-                    <div>
-                      <h3 className="text-white font-medium">{item.title}</h3>
-                      <p className="text-gray-400 text-sm">
-                        {item.year} • {item.type}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-foreground font-medium truncate">{item.title}</h3>
+                      <p className="text-muted-foreground text-sm">
+                        {item.year} • {item.type} • ⭐ {item.rating}
                       </p>
+                      {item.overview && (
+                        <p className="text-muted-foreground text-xs mt-1 line-clamp-2">{item.overview}</p>
+                      )}
                     </div>
                   </div>
                 </Card>
               ))}
             </div>
+          ) : query.trim() && !loading ? (
+            <div className="text-center text-muted-foreground py-8">No results found for "{query}"</div>
           ) : (
-            <div className="text-center text-gray-400 py-8">No results found for "{query}"</div>
+            <div className="text-center text-muted-foreground py-8">Start typing to search for movies...</div>
           )}
         </div>
       </DialogContent>
